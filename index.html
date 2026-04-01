@@ -1,2 +1,263 @@
-<h1>Hello world!</h1>
-<p>This is my first website.</p>
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Drake Assistant</title>
+
+<style>
+
+body{
+margin:0;
+background:#080808;
+color:white;
+font-family:monospace;
+}
+
+#debug{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:160px;
+background:black;
+color:#00ff88;
+overflow:auto;
+padding:10px;
+border-bottom:2px solid #00ff88;
+}
+
+#light{
+width:100vw;
+height:100vh;
+background:rgb(10,10,10);
+transition:0.5s;
+}
+
+#center{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+text-align:center;
+}
+
+button{
+padding:14px 28px;
+font-size:16px;
+cursor:pointer;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="light"></div>
+
+<div id="debug"></div>
+
+<div id="center">
+<h1>Drake Assistant</h1>
+<button onclick="startAssistant()">Start Assistant</button>
+</div>
+
+<script>
+
+const API_KEY="YOUR_MISTRAL_API_KEY"
+
+let recognition
+
+// DEBUG
+
+function log(t){
+
+let d=document.getElementById("debug")
+
+d.innerHTML+=t+"<br>"
+
+d.scrollTop=d.scrollHeight
+
+}
+
+// LIGHT
+
+let brightness=10
+
+function setLight(v){
+
+brightness=v
+
+document.getElementById("light").style.background=
+`rgb(${v},${v},${v})`
+
+}
+
+// SPEAK
+
+function speak(t){
+
+log("SPEAK → "+t)
+
+let u=new SpeechSynthesisUtterance(t)
+
+speechSynthesis.speak(u)
+
+}
+
+// SYSTEM PROMPT
+
+const PROMPT=`
+
+You are a smart assistant controlling lights and answering questions.
+
+Respond ONLY in JSON.
+
+Format
+
+{
+"type":"light | question",
+"action":"optional",
+"value":"optional",
+"response":"optional",
+"speak":true
+}
+
+Examples
+
+{"type":"light","action":"brightness","value":255}
+
+{"type":"question","response":"Photosynthesis is how plants make food.","speak":true}
+
+Never output text outside JSON.
+
+`
+
+// AI
+
+async function askAI(cmd){
+
+log("USER → "+cmd)
+
+let res=await fetch(
+"https://api.mistral.ai/v1/chat/completions",
+{
+
+method:"POST",
+
+headers:{
+"Authorization":"Bearer "+API_KEY,
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+model:"mistral-large-2512",
+
+messages:[
+{role:"system",content:PROMPT},
+{role:"user",content:cmd}
+]
+
+})
+
+})
+
+let data=await res.json()
+
+let txt=data.choices[0].message.content
+
+log("AI RAW → "+txt)
+
+let json
+
+try{
+
+json=JSON.parse(txt)
+
+}catch(e){
+
+log("JSON ERROR")
+
+return
+
+}
+
+handleCommand(json)
+
+}
+
+// COMMAND
+
+function handleCommand(cmd){
+
+if(cmd.type==="question"){
+
+if(cmd.speak){
+
+speak(cmd.response)
+
+}
+
+}
+
+if(cmd.type==="light"){
+
+if(cmd.action==="brightness"){
+
+setLight(cmd.value)
+
+}
+
+}
+
+}
+
+// START ASSISTANT
+
+async function startAssistant(){
+
+log("Requesting mic...")
+
+await navigator.mediaDevices.getUserMedia({audio:true})
+
+log("Mic allowed")
+
+const SpeechRecognition=
+window.SpeechRecognition||
+window.webkitSpeechRecognition
+
+recognition=new SpeechRecognition()
+
+recognition.continuous=true
+
+recognition.onresult=function(e){
+
+let text=e.results[e.results.length-1][0].transcript
+
+log("HEARD → "+text)
+
+text=text.toLowerCase()
+
+if(text.includes("drake")){
+
+let cmd=text.replace("drake","")
+
+askAI(cmd)
+
+}
+
+}
+
+recognition.start()
+
+log("Listening...")
+
+}
+
+</script>
+
+</body>
+</html>
+```
